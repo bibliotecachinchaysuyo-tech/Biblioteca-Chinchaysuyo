@@ -117,6 +117,11 @@
                     <span>Historial</span>
                     <span class="badge" id="histBadge">0</span>
                 </button>
+                <button type="button" id="clearHistoryBtn" aria-label="Eliminar historial de lectura"
+                    style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;padding:10px 12px;border:1px solid #ef4444;border-radius:10px;background:rgba(239,68,68,.09);color:#dc2626;font:inherit;font-size:13px;font-weight:600;cursor:pointer;">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span>Eliminar historial leído</span>
+                </button>
             </div>
 
             <a href="login.html" class="logout">
@@ -218,7 +223,7 @@
                 <option value="title-asc">Título A–Z</option>
                 <option value="title-desc">Título Z–A</option>
                 <option value="author-asc">Autor A–Z</option>
-            </select>      
+            </select>
         </div>
 
         <!-- Catálogo -->
@@ -1003,7 +1008,7 @@
                         <button type="button" class="fav-btn" aria-label="Añadir a favoritos" title="Favorito"><i class="fa-regular fa-heart"></i></button>
 
                         <img
-                            src="imagenes/economia para principiantes.webp"
+                            src="imagenes/Economia para principiantes.webp"
                                 class="portada-completa"
 
                             alt="Economía para principiantes">
@@ -1153,7 +1158,7 @@
                         <button type="button" class="fav-btn" aria-label="Añadir a favoritos" title="Favorito"><i class="fa-regular fa-heart"></i></button>
 
                         <img
-                            src="juanita/mundo.jpg .jpeg"
+                            src="juanita/mundo.jpg"
                                 class="portada-completa"
 
                             alt="La vuelta al mundo en 80 días">
@@ -5920,21 +5925,21 @@
 
 
                 <!-- PORTADA EJEMPLO 3 - Diccionario latín-español -->
-                <article class="book-card" data-category="Diccionarios" data-title="Libro de ejemplo 3" data-author="Autor de ejemplo" data-link="#" data-img="https://placehold.co/600x850?text=Portada%20ejemplo%203">
+                <article class="book-card" data-category="Diccionarios" data-title="Libro de ejemplo 3" data-author="Autor de ejemplo" data-link="https://drive.google.com/file/d/1r9wCkZXoCUKmLQR0OuIWqOCdNV2dwj4F/view?usp=sharing" data-img="Diccionario/Portada tipográfica María Moliner.png">
                     <div class="book-cover">
                         <button type="button" class="fav-btn" aria-label="Añadir a favoritos" title="Favorito"><i class="fa-regular fa-heart"></i></button>
-                        <img src="https://placehold.co/600x850?text=Portada%20ejemplo%203"
+                        <img src="Diccionario/Portada tipográfica María Moliner.png"
                              alt="Portada ejemplo Diccionario latín-español 3">
                         <span class="available">Disponible</span>
                     </div>
 
                     <div class="book-content">
                         <span class="book-category">Diccionario latín-español</span>
-                        <h3>Libro de ejemplo 3</h3>
+                        <h3>Diccionario de sinónimos y antónimos</h3>
 
                         <p class="author">
                             <i class="fa-solid fa-user"></i>
-                            Autor de ejemplo
+                            María Moliner
                         </p>
 
                         <div class="book-footer">
@@ -5944,7 +5949,7 @@
                             </span>
                         </div>
 
-                        <div class="card-actions"><a href="#" class="request-button">
+                        <div class="card-actions"><a href="https://drive.google.com/file/d/1r9wCkZXoCUKmLQR0OuIWqOCdNV2dwj4F/view?usp=sharing" target="_blank" class="request-button">
                             <i class="fa-solid fa-book-open"></i>
                             Lectura Online
                         </a>
@@ -7295,6 +7300,21 @@
         }
         histBadge.textContent = history.length;
 
+        // Botón para borrar todos los libros del historial de lectura.
+        document.getElementById("clearHistoryBtn").addEventListener("click", () => {
+            if (history.length === 0) {
+                showToast("El historial ya está vacío");
+                return;
+            }
+            if (!confirm("¿Seguro que deseas eliminar todo el historial de lectura? Esta acción no se puede deshacer.")) return;
+
+            history = [];
+            saveJSON(STORAGE_HIST, history);
+            histBadge.textContent = "0";
+            if (modoEspecial === "history") applyFilters();
+            showToast("Historial de lectura eliminado");
+        });
+
         /* ---------- Asignar grado a libros de secundaria ---------- */
         function assignGrades() {
             let currentGrade = null;
@@ -7313,64 +7333,114 @@
         assignGrades();
 
         /* ---------- Filtrado principal ---------- */
+        /* ---------- BUSCADOR GLOBAL DE TODAS LAS SECCIONES ---------- */
         function applyFilters() {
-            const texto = buscador.value.toLowerCase().trim();
+            const texto = buscador.value.trim();
+            const normalizar = texto =>
+                texto.normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase();
+
+            const busqueda = normalizar(texto);
             let visibles = 0;
             const sort = sortSelect.value;
 
-            // Ordenar visualmente si hace falta
-            if (sort !== "default" && modoEspecial === null && categoriaActual) {
-                // reordenamos solo los visibles más abajo
-            }
-
             libros.forEach(libro => {
-                const cat = libro.dataset.category;
+                const categoria = libro.dataset.category || "";
                 const id = bookId(libro);
-                const grade = libro.dataset.grade || "";
-                const textMatch = texto === "" || libro.textContent.toLowerCase().includes(texto);
+                const grado = libro.dataset.grade || "";
 
-                let show = false;
+                // Busca en título, autor, categoría y texto completo de la tarjeta.
+                const contenido = normalizar([
+                    libro.dataset.title || "",
+                    libro.dataset.author || "",
+                    categoria,
+                    libro.textContent || ""
+                ].join(" "));
+
+                const coincideTexto =
+                    busqueda === "" || contenido.includes(busqueda);
+
+                let mostrar = false;
+
                 if (modoEspecial === "favorites") {
-                    show = favorites.includes(id) && textMatch;
+                    mostrar = favorites.includes(id) && coincideTexto;
                 } else if (modoEspecial === "history") {
-                    show = history.includes(id) && textMatch;
+                    mostrar = history.includes(id) && coincideTexto;
                 } else {
-                    const catMatch = cat === categoriaActual;
-                    const gradeMatch = categoriaActual !== "Libro Secundaria" || gradoActual === "all" || grade === gradoActual;
-                    show = catMatch && gradeMatch && textMatch;
+                    // Con texto escrito, buscar en todas las categorías.
+                    // Sin texto, respetar la sección seleccionada.
+                    const coincideCategoria =
+                        busqueda !== "" || categoria === categoriaActual;
+
+                    // La búsqueda global no se limita al grado seleccionado.
+                    const coincideGrado =
+                        busqueda !== "" ||
+                        categoriaActual !== "Libro Secundaria" ||
+                        gradoActual === "all" ||
+                        grado === gradoActual;
+
+                    mostrar =
+                        coincideCategoria &&
+                        coincideGrado &&
+                        coincideTexto;
                 }
 
-                libro.style.display = show ? "" : "none";
-                if (show) visibles++;
+                libro.style.display = mostrar ? "" : "none";
+                if (mostrar) visibles++;
             });
 
-            // Grade dividers
+            // Ocultar los separadores de grado durante la búsqueda global.
             gradeDividers.forEach(div => {
-                if (modoEspecial || texto || categoriaActual !== "Libro Secundaria") {
+                if (
+                    modoEspecial ||
+                    busqueda !== "" ||
+                    categoriaActual !== "Libro Secundaria"
+                ) {
                     div.style.display = "none";
                     return;
                 }
-                const g = div.dataset.grade;
-                div.style.display = (gradoActual === "all" || g === gradoActual) ? "flex" : "none";
+
+                const grado = div.dataset.grade;
+                div.style.display =
+                    gradoActual === "all" || grado === gradoActual
+                        ? "flex"
+                        : "none";
             });
 
-            // Toolbar visibility
-            toolbar.style.display = (modoEspecial || categoriaActual !== "Libro Secundaria") ? "none" : "flex";
+            // Ocultar filtros de grado mientras se busca en todo el catálogo.
+            toolbar.style.display =
+                (modoEspecial ||
+                 busqueda !== "" ||
+                 categoriaActual !== "Libro Secundaria")
+                    ? "none"
+                    : "flex";
 
-            // Contador
-            const unit = texto
-                ? (visibles === 1 ? " resultado" : " resultados")
-                : (visibles === 1 ? " libro disponible" : " libros disponibles");
-            bookCount.textContent = visibles + unit;
+            // Contador de resultados.
+            if (busqueda !== "") {
+                bookCount.textContent =
+                    visibles + (visibles === 1
+                        ? " resultado encontrado"
+                        : " resultados encontrados");
+            } else {
+                bookCount.textContent =
+                    visibles + (visibles === 1
+                        ? " libro disponible"
+                        : " libros disponibles");
+            }
 
-            // Empty state
+            // Estado vacío y recomendaciones.
             if (visibles === 0) {
                 noBooks.style.display = "block";
-                emptySectionName.textContent = modoEspecial === "favorites"
-                    ? "tus favoritos"
-                    : modoEspecial === "history"
-                        ? "tu historial"
-                        : (texto ? "tu búsqueda" : "esta sección");
+                emptySectionName.textContent =
+                    modoEspecial === "favorites"
+                        ? "tus favoritos"
+                        : modoEspecial === "history"
+                            ? "tu historial"
+                            : busqueda !== ""
+                                ? "tu búsqueda en todas las secciones"
+                                : "esta sección";
+
                 recommendations.classList.add("visible");
                 showRecommendations();
             } else {
@@ -7378,8 +7448,10 @@
                 recommendations.classList.remove("visible");
             }
 
-            // Orden
-            if (sort !== "default") sortVisibleBooks(sort);
+            // Mantener el orden seleccionado.
+            if (sort !== "default") {
+                sortVisibleBooks(sort);
+            }
         }
 
         function sortVisibleBooks(mode) {
